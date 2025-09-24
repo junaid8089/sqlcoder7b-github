@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 app = FastAPI(title="SQLCoder 7B API")
 
-# Define request model
+# Request body model
 class Query(BaseModel):
     prompt: str
 
@@ -24,9 +24,16 @@ def generate_sql(query: Query):
     prompt = query.prompt
     try:
         from huggingface_hub import InferenceApi
+
+        # Initialize HF Inference API
         infer = InferenceApi(repo_id="defog/sqlcoder-7b-2", token=hf_token)
+
+        # Call model
         response = infer(prompt, {"max_new_tokens": 128})
         return {"result": response}
+
     except Exception as e:
-        # Catch HF API errors and return clean JSON
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log error in terminal for debugging
+        print("ERROR in /generate:", e)
+        # Return readable JSON to client
+        raise HTTPException(status_code=500, detail=f"Hugging Face API Error: {str(e)}")
