@@ -1,29 +1,32 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
 import os
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 app = FastAPI(title="SQLCoder 7B API")
 
+# Define request model
 class Query(BaseModel):
     prompt: str
 
-@app.post("/generate")
-def generate_sql(query: Query):
-    prompt = query.prompt
-    hf_token = os.environ.get("HF_TOKEN")
+# Read Hugging Face token from environment
+hf_token = os.environ.get("HF_TOKEN")
+if not hf_token:
+    raise ValueError("HF_TOKEN not found in environment. Set it in Codespaces or GitHub Secrets.")
 
-    if hf_token:
-        from huggingface_hub import InferenceApi
-        infer = InferenceApi(repo_id="defog/sqlcoder-7b-2", token=hf_token)
-        resp = infer(prompt, {"max_new_tokens": 128})
-        return {"result": resp}
-
-    # Fallback demo with GPT-2 (no HF_TOKEN)
-    from transformers import pipeline
-    gen = pipeline("text-generation", model="gpt2")
-    out = gen(prompt, max_new_tokens=64)
-    return {"result": out[0]["generated_text"]}
-
+# Root endpoint
 @app.get("/")
 def root():
     return {"message": "SQLCoder 7B API running"}
+
+# Generate SQL endpoint
+@app.post("/generate")
+def generate_sql(query: Query):
+    prompt = query.prompt
+    try:
+        from huggingface_hub import InferenceApi
+        infer = InferenceApi(repo_id="defog/sqlcoder-7b-2", token=hf_token)
+        response = infer(prompt, {"max_new_tokens": 128})
+        return {"result": response}
+    except Exception as e:
+        # Catch HF API errors and return clean JSON
+        raise HTTPException(status_code=500, detail=str(e))
